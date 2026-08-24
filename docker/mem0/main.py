@@ -63,7 +63,11 @@ def _load_config() -> dict:
 
         # Ensure version and defaults
         cfg.setdefault("version", "v1.1")
-        cfg.setdefault("history_db_path", "/app/history/history.db")
+        # Patch 1: use /tmp path so server works natively on macOS (not inside Docker)
+        cfg.setdefault(
+            "history_db_path",
+            os.getenv("HISTORY_DB_PATH", "/tmp/mem0-history/history.db"),
+        )
 
         # Inject Qdrant connection if vector_store not specified
         if "vector_store" not in cfg:
@@ -231,14 +235,21 @@ def search_memories(req: SearchRequest):
     """Search memories by semantic similarity + BM25 + entity boost."""
     mem = _get_memory()
     params: dict[str, Any] = {"limit": req.limit}
+
+    # Patch 2: mem0 ≥ 2.x requires entity IDs inside filters={}, not as top-level kwargs.
+    # Build the filters dict and merge any caller-supplied filters into it.
+    entity_filters: dict[str, Any] = {}
     if req.user_id:
-        params["user_id"] = req.user_id
+        entity_filters["user_id"] = req.user_id
     if req.agent_id:
-        params["agent_id"] = req.agent_id
+        entity_filters["agent_id"] = req.agent_id
     if req.run_id:
-        params["run_id"] = req.run_id
+        entity_filters["run_id"] = req.run_id
     if req.filters:
-        params["filters"] = req.filters
+        entity_filters.update(req.filters)
+    if entity_filters:
+        params["filters"] = entity_filters
+
     if req.rerank:
         params["rerank"] = True
 
@@ -258,19 +269,21 @@ def get_memories(
 ):
     """List all memories for a given user/agent/run."""
     mem = _get_memory()
-    params: dict[str, Any] = {}
-    if user_id:
-        params["user_id"] = user_id
-    if agent_id:
-        params["agent_id"] = agent_id
-    if run_id:
-        params["run_id"] = run_id
 
-    if not params:
+    # Patch 3: mem0 ≥ 2.x requires entity IDs inside filters={}.
+    entity_filters: dict[str, Any] = {}
+    if user_id:
+        entity_filters["user_id"] = user_id
+    if agent_id:
+        entity_filters["agent_id"] = agent_id
+    if run_id:
+        entity_filters["run_id"] = run_id
+
+    if not entity_filters:
         raise HTTPException(400, "Provide at least one of: user_id, agent_id, run_id")
 
     try:
-        return mem.get_all(**params)
+        return mem.get_all(filters=entity_filters)
     except Exception as e:
         logger.exception("get_all() failed")
         raise HTTPException(500, str(e))
@@ -315,19 +328,21 @@ def delete_all_memories(
 ):
     """Delete all memories for a user/agent/run."""
     mem = _get_memory()
-    params: dict[str, Any] = {}
-    if user_id:
-        params["user_id"] = user_id
-    if agent_id:
-        params["agent_id"] = agent_id
-    if run_id:
-        params["run_id"] = run_id
 
-    if not params:
+    # Patch 3: mem0 ≥ 2.x requires entity IDs inside filters={}.
+    entity_filters: dict[str, Any] = {}
+    if user_id:
+        entity_filters["user_id"] = user_id
+    if agent_id:
+        entity_filters["agent_id"] = agent_id
+    if run_id:
+        entity_filters["run_id"] = run_id
+
+    if not entity_filters:
         raise HTTPException(400, "Provide at least one of: user_id, agent_id, run_id")
 
     try:
-        mem.delete_all(**params)
+        mem.delete_all(filters=entity_filters)
         return {"message": "All memories deleted"}
     except Exception as e:
         raise HTTPException(500, str(e))

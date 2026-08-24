@@ -337,10 +337,11 @@ function FlipsSection({ flips }: { flips: ComparisonData["flips"] }) {
     "all"
   );
 
-  const regressions = flips.details.filter(
+  const details = flips.details ?? [];
+  const regressions = details.filter(
     (f) => f.direction === "regression"
   );
-  const improvements = flips.details.filter(
+  const improvements = details.filter(
     (f) => f.direction === "improvement"
   );
 
@@ -349,7 +350,7 @@ function FlipsSection({ flips }: { flips: ComparisonData["flips"] }) {
       ? regressions
       : filter === "improvements"
         ? improvements
-        : flips.details;
+        : details;
 
   return (
     <div className="space-y-4">
@@ -388,7 +389,7 @@ function FlipsSection({ flips }: { flips: ComparisonData["flips"] }) {
             }`}
           >
             {f === "all"
-              ? `All (${flips.details.length})`
+              ? `All (${details.length})`
               : f === "regressions"
                 ? `Regressions (${regressions.length})`
                 : `Improvements (${improvements.length})`}
@@ -479,15 +480,15 @@ function FlipCard({ flip }: { flip: FlipDetail }) {
                   A
                 </span>
                 <span className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">
-                  Retrieved ({flip.retrieval_a.length})
+                  Retrieved ({(flip.retrieval_a ?? []).length})
                 </span>
                 <VerdictPill verdict={flip.verdict_a} />
               </div>
               <div className="space-y-1">
-                {flip.retrieval_a.length === 0 ? (
+                {(flip.retrieval_a ?? []).length === 0 ? (
                   <p className="text-xs text-neutral-400">No memories</p>
                 ) : (
-                  flip.retrieval_a.map((m, i) => (
+                  (flip.retrieval_a ?? []).map((m, i) => (
                     <SimpleMemoryRow
                       key={i}
                       rank={i + 1}
@@ -506,15 +507,15 @@ function FlipCard({ flip }: { flip: FlipDetail }) {
                   B
                 </span>
                 <span className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">
-                  Retrieved ({flip.retrieval_b.length})
+                  Retrieved ({(flip.retrieval_b ?? []).length})
                 </span>
                 <VerdictPill verdict={flip.verdict_b} />
               </div>
               <div className="space-y-1">
-                {flip.retrieval_b.length === 0 ? (
+                {(flip.retrieval_b ?? []).length === 0 ? (
                   <p className="text-xs text-neutral-400">No memories</p>
                 ) : (
-                  flip.retrieval_b.map((m, i) => (
+                  (flip.retrieval_b ?? []).map((m, i) => (
                     <SimpleMemoryRow
                       key={i}
                       rank={i + 1}
@@ -581,7 +582,7 @@ function UnchangedSection({
               </tr>
             </thead>
             <tbody>
-              {unchanged.details.map((item) => (
+              {(unchanged.details ?? []).map((item) => (
                 <tr
                   key={item.question_id}
                   className="border-t border-neutral-100 hover:bg-neutral-50/50 transition-colors duration-100"

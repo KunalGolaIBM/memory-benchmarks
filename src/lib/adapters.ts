@@ -223,31 +223,31 @@ function normalizeLocomo(
     const primaryResult = cutoffResults?.[primaryCutoff];
     const predict = predictLookup.get(ev.question_id as string);
 
-    // Build retrieval from predict data if available
+    // Build retrieval: prefer inline ev.retrieval (new combined format),
+    // then fall back to separate predictData lookup (old split format).
     let retrieval: RetrievalData | undefined;
-    if (predict) {
-      const ret = predict.retrieval as Record<string, unknown> | undefined;
-      if (ret) {
-        const searchResults = (ret.search_results ?? []) as Record<
-          string,
-          unknown
-        >[];
-        retrieval = {
-          query: (ret.search_query as string) ?? (ev.question as string),
-          latency_ms: ret.search_latency_ms as number | undefined,
-          total_results:
-            (ret.total_results as number) ?? searchResults.length,
-          results: searchResults.map((sr, i) => ({
-            rank: i + 1,
-            memory: sr.memory as string,
-            score: sr.score as number,
-            id: sr.id as string | undefined,
-            created_at: sr.created_at as string | undefined,
-            score_debug: sr.score_debug as ScoreDebug | undefined,
-          })),
-          query_debug: ret.query_debug as QueryDebug | undefined,
-        };
-      }
+    const retSource = (ev.retrieval as Record<string, unknown> | undefined)
+      ?? (predict?.retrieval as Record<string, unknown> | undefined);
+    if (retSource) {
+      const searchResults = (retSource.search_results ?? []) as Record<
+        string,
+        unknown
+      >[];
+      retrieval = {
+        query: (retSource.search_query as string) ?? (ev.question as string),
+        latency_ms: retSource.search_latency_ms as number | undefined,
+        total_results:
+          (retSource.total_results as number) ?? searchResults.length,
+        results: searchResults.map((sr, i) => ({
+          rank: i + 1,
+          memory: sr.memory as string,
+          score: sr.score as number,
+          id: sr.id as string | undefined,
+          created_at: sr.created_at as string | undefined,
+          score_debug: sr.score_debug as ScoreDebug | undefined,
+        })),
+        query_debug: retSource.query_debug as QueryDebug | undefined,
+      };
     }
 
     // Build judgment

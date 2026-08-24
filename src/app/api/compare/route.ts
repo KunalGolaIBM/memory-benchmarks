@@ -86,6 +86,8 @@ interface FlipDetail {
   verdict_b: "correct" | "incorrect" | "error";
   score_a: number;
   score_b: number;
+  retrieval_a: { memory: string; score: number }[];
+  retrieval_b: { memory: string; score: number }[];
 }
 
 export function GET(req: NextRequest) {
@@ -212,6 +214,14 @@ export function GET(req: NextRequest) {
         verdict_b: verdictB,
         score_a: scoreA,
         score_b: scoreB,
+        retrieval_a: (evA.retrieval?.results ?? []).map((r) => ({
+          memory: r.memory,
+          score: r.score,
+        })),
+        retrieval_b: (evB.retrieval?.results ?? []).map((r) => ({
+          memory: r.memory,
+          score: r.score,
+        })),
       });
     } else {
       if (verdictA === "correct") unchangedCorrect++;

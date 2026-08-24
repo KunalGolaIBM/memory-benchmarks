@@ -583,9 +583,9 @@ function EvalItemCard({
                 )}
               </div>
               <div className="space-y-1 max-h-[400px] overflow-auto">
-                {retrieval.results.map((mem) => (
+                {(retrieval.results ?? []).map((mem) => (
                   <MemoryRow
-                    key={`${mem.rank}-${mem.id ?? mem.memory.slice(0, 20)}`}
+                    key={`${mem.rank}-${mem.id ?? (mem.memory ?? "").slice(0, 20)}`}
                     memory={mem}
                   />
                 ))}
@@ -604,9 +604,9 @@ function EvalItemCard({
                   </p>
                 )}
                 {item.judgment.key_facts &&
-                  item.judgment.key_facts.length > 0 && (
+                  (item.judgment.key_facts ?? []).length > 0 && (
                     <div className="space-y-1.5 mt-3">
-                      {item.judgment.key_facts.map((kf, i) => (
+                      {(item.judgment.key_facts ?? []).map((kf, i) => (
                         <KeyFactRow key={i} fact={kf} />
                       ))}
                     </div>

@@ -66,7 +66,45 @@ export function ConversationsView({ runId }: ConversationsViewProps) {
         return res.json();
       })
       .then((data) => {
-        setConversations(data.conversations ?? []);
+        // Flatten server shape (session→chunks[]→messages[]) into component shape
+        // (session→messages[], session→extractedMemories[])
+        const normalized: ConversationData[] = (data.conversations ?? []).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (conv: any) => ({
+            label: conv.label ?? `Conv ${conv.conversation_idx ?? 0}`,
+            sessions: (conv.sessions ?? []).map((sess: any) => {
+              const chunks: any[] = sess.chunks ?? [];
+              const messages: MessageData[] = chunks.flatMap((ch: any) =>
+                (ch.messages ?? []).map((m: any) => ({
+                  speaker: m.speaker ?? "",
+                  text: m.text ?? "",
+                  timestamp: sess.date,
+                  turnId: m.dia_id,
+                }))
+              );
+              const extractedMemories: MemoryData[] = chunks.flatMap(
+                (ch: any) =>
+                  (ch.extracted_memories ?? []).map((mem: any) => ({
+                    text: typeof mem === "string" ? mem : mem.memory ?? String(mem),
+                    eventType: mem.event,
+                  }))
+              );
+              return {
+                id: sess.session_id ?? String(sess.session_idx ?? 0),
+                messages,
+                extractedMemories,
+                isAnswerSession: (sess.contains_answer_for ?? []).length > 0,
+              };
+            }),
+            questions: (conv.questions ?? []).map((q: any) => ({
+              id: q.question_id ?? q.id ?? "",
+              question: q.question ?? "",
+              groundTruth: q.answer ?? q.ground_truth ?? "",
+              evidence: q.evidence ?? [],
+            })),
+          })
+        );
+        setConversations(normalized);
         setEvalType(data.eval_type ?? "");
         setError("");
       })
@@ -123,15 +161,15 @@ function ConversationsViewInner({
   const [showQuestions, setShowQuestions] = useState(false);
 
   const activeConv = conversations[selectedConvIdx];
-  const activeSession = activeConv.sessions.find(
+  const activeSession = activeConv?.sessions?.find(
     (s) => s.id === selectedSessionId
   );
 
-  const filteredSessions = activeConv.sessions.filter((session) => {
+  const filteredSessions = (activeConv?.sessions ?? []).filter((session) => {
     if (!searchText) return true;
     const lower = searchText.toLowerCase();
     return (
-      session.messages.some((m) => m.text.toLowerCase().includes(lower)) ||
+      (session.messages ?? []).some((m) => m.text.toLowerCase().includes(lower)) ||
       session.extractedMemories?.some((m) =>
         m.text.toLowerCase().includes(lower)
       )

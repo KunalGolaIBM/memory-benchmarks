@@ -1032,6 +1032,10 @@ def parse_args() -> argparse.Namespace:
         "--rpm", type=int, default=200,
         help="Requests per minute for LLM",
     )
+    parser.add_argument("--base-url", default=None,
+                        help="OpenAI-compatible base URL (e.g. http://0.0.0.0:11434/v1 for Ollama)")
+    parser.add_argument("--api-key", default=None,
+                        help="API key override (use 'ollama' as a dummy key for Ollama)")
     parser.add_argument(
         "--backend", default="oss", choices=["oss", "cloud"],
         help="Mem0 backend: 'oss' for self-hosted server (default), 'cloud' for api.mem0.ai",
@@ -1114,10 +1118,12 @@ async def async_main() -> None:
 
     answerer = LLMClient(
         model=args.answerer_model, provider=args.provider, rpm=args.rpm,
+        base_url=args.base_url, api_key=args.api_key,
     )
     judge_provider = args.judge_provider or args.provider
     judge_llm = LLMClient(
         model=args.judge_model, provider=judge_provider, rpm=args.rpm,
+        base_url=args.base_url, api_key=args.api_key,
     )
 
     if args.evaluate_only:

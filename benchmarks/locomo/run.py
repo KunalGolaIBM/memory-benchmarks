@@ -709,6 +709,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--user-profile", action="store_true", help="Fetch user profiles")
     parser.add_argument("--max-questions", type=int, default=None, help="Max questions to process (for quick testing)")
     parser.add_argument("--rpm", type=int, default=200, help="Requests per minute for LLM")
+    parser.add_argument("--base-url", default=None,
+                        help="OpenAI-compatible base URL (e.g. http://0.0.0.0:11434/v1 for Ollama). "
+                             "When set, provider must be 'openai'. Use --api-key 'ollama' if needed.")
+    parser.add_argument("--api-key", default=None,
+                        help="API key override (use 'ollama' as a dummy key for Ollama compatibility)")
     parser.add_argument("--backend", default="oss", choices=["oss", "cloud"],
                         help="Mem0 backend: 'oss' for self-hosted server (default), 'cloud' for api.mem0.ai")
     parser.add_argument("--mem0-host", default=None,
@@ -754,9 +759,15 @@ async def async_main() -> None:
         evidence_lookup = load_evidence_lookup(dataset_path)
         print(f"  Evidence lookup: {len(evidence_lookup)} entries")
 
-    answerer = LLMClient(model=args.answerer_model, provider=args.provider, rpm=args.rpm)
+    answerer = LLMClient(
+        model=args.answerer_model, provider=args.provider, rpm=args.rpm,
+        base_url=args.base_url, api_key=args.api_key,
+    )
     judge_provider = args.judge_provider or args.provider
-    judge_llm = LLMClient(model=args.judge_model, provider=judge_provider, rpm=args.rpm)
+    judge_llm = LLMClient(
+        model=args.judge_model, provider=judge_provider, rpm=args.rpm,
+        base_url=args.base_url, api_key=args.api_key,
+    )
 
     if args.evaluate_only:
         expected_items = expected_locomo_question_items(

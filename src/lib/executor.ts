@@ -7,6 +7,27 @@ import type { EvalTemplate } from "./templates";
 const REPO_ROOT = process.cwd();
 const LOGS_DIR = path.join(REPO_ROOT, "logs");
 
+// Prefer the project-local python path; fall back to whatever is on PATH
+const PYTHON =
+  process.env.BENCHMARK_PYTHON ??
+  (() => {
+    for (const p of [
+      "/opt/homebrew/bin/python3.11",
+      "/usr/local/bin/python3.11",
+      "/usr/bin/python3.11",
+      "/opt/homebrew/bin/python3",
+      "python3",
+    ]) {
+      try {
+        require("child_process").execFileSync(p, ["--version"], { stdio: "ignore" });
+        return p;
+      } catch {
+        /* not found */
+      }
+    }
+    return "python3";
+  })();
+
 // Track running processes in memory
 const runningProcesses = new Map<string, ChildProcess>();
 
@@ -88,7 +109,8 @@ export function startRun(
     `${"=".repeat(60)}\n\n`;
   logStream.write(header);
 
-  const proc = spawn("python3", [scriptPath, ...args], {
+  const moduleId = template.script_path.replace(/\//g, ".").replace(/\.py$/, "");
+  const proc = spawn(PYTHON, ["-m", moduleId, ...args], {
     cwd: REPO_ROOT,
     env: buildScriptEnv(runConfig.env_overrides),
     stdio: ["ignore", "pipe", "pipe"],
