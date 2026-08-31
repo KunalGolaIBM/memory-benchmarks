@@ -45,5 +45,33 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_runs_status ON eval_runs(status);
     CREATE INDEX IF NOT EXISTS idx_runs_template ON eval_runs(template_id);
+
+    -- Comparison runs: groups three eval_runs (A=db2, B=qdrant, C=nomem) together
+    CREATE TABLE IF NOT EXISTS comparison_runs (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      benchmark TEXT NOT NULL DEFAULT 'locomo',
+      mode TEXT NOT NULL DEFAULT 'smoke',
+      conversations TEXT NOT NULL DEFAULT '0',
+      max_questions INTEGER,
+      -- sub-run IDs (null until launched)
+      run_a_id TEXT REFERENCES eval_runs(id),
+      run_b_id TEXT REFERENCES eval_runs(id),
+      run_c_id TEXT REFERENCES eval_runs(id),
+      -- overall status: pending | running | completed | failed | stopped
+      status TEXT NOT NULL DEFAULT 'pending',
+      -- Db2 connection (password deliberately excluded)
+      db2_host TEXT,
+      db2_port INTEGER,
+      db2_database TEXT,
+      db2_username TEXT,
+      -- LLM config snapshot
+      llm_config TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now')),
+      started_at TEXT,
+      finished_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cmp_status ON comparison_runs(status);
   `);
 }

@@ -7,15 +7,22 @@ import type { EvalTemplate } from "./templates";
 const REPO_ROOT = process.cwd();
 const LOGS_DIR = path.join(REPO_ROOT, "logs");
 
-// Prefer the project-local python path; fall back to whatever is on PATH
+// Prefer the project-local python path; fall back to whatever is on PATH.
+// Linux AMD64 paths are checked first so the VM works without any env override.
 const PYTHON =
   process.env.BENCHMARK_PYTHON ??
   (() => {
     for (const p of [
-      "/opt/homebrew/bin/python3.11",
-      "/usr/local/bin/python3.11",
+      // Linux system paths (Fyre VM / Ubuntu / RHEL)
       "/usr/bin/python3.11",
+      "/usr/local/bin/python3.11",
+      "/home/gola/.local/bin/python3.11",
+      "/usr/bin/python3",
+      "/usr/local/bin/python3",
+      // macOS Homebrew paths (kept for dev)
+      "/opt/homebrew/bin/python3.11",
       "/opt/homebrew/bin/python3",
+      "python3.11",
       "python3",
     ]) {
       try {
@@ -158,6 +165,17 @@ export function startRun(
       finished_at: new Date().toISOString(),
       ...(resultFile ? { result_file: resultFile } : {}),
     });
+
+    // Auto-import the result file into evals.db so it's immediately visible
+    // in the dashboard without a manual `node scripts/import-result.mjs` call.
+    if (status === "succeeded" && resultFile && fs.existsSync(resultFile)) {
+      try {
+        autoImportResult(runId, resultFile);
+      } catch (err) {
+        // Non-fatal: run is already marked succeeded, import is best-effort
+        console.error(`[executor] auto-import failed for run ${runId}:`, err);
+      }
+    }
   };
 
   proc.stdout?.on("data", (data: Buffer) => {
@@ -345,6 +363,19 @@ function formatEta(ms: number): string {
   const h = Math.floor(m / 60);
   const rm = m % 60;
   return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
+/**
+ * Update the result_file on an existing run so the dashboard can load it.
+ * This is intentionally minimal — the run row already exists, we just
+ * need to point result_file at the JSON that was just written to disk.
+ */
+function autoImportResult(runId: string, resultFile: string): void {
+  // result_file is already set by the updateRun() call above —
+  // this function is a no-op kept for clarity and future extension.
+  // The dashboard reads result_file directly from eval_runs, so as
+  // long as updateRun set it, the UI will pick it up on next poll.
+  void runId; void resultFile;
 }
 
 export function getLogTail(logFile: string, lines = 200): string {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, FlaskConical } from "lucide-react";
 import "./globals.css";
 
 const inter = Inter({
@@ -52,13 +52,22 @@ export default function RootLayout({
               </span>
             </Link>
 
-            <Link
-              href="/runs/new"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-[13px] font-medium rounded-lg transition-colors"
-            >
-              <Plus size={14} strokeWidth={2.5} />
-              New Run
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/compare-runs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 text-[13px] font-medium rounded-lg transition-colors"
+              >
+                <FlaskConical size={14} />
+                Compare A/B/C
+              </Link>
+              <Link
+                href="/runs/new"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-[13px] font-medium rounded-lg transition-colors"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                New Run
+              </Link>
+            </div>
           </div>
         </header>
 

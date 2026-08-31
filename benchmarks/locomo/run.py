@@ -714,12 +714,25 @@ def parse_args() -> argparse.Namespace:
                              "When set, provider must be 'openai'. Use --api-key 'ollama' if needed.")
     parser.add_argument("--api-key", default=None,
                         help="API key override (use 'ollama' as a dummy key for Ollama compatibility)")
+    parser.add_argument("--judge-base-url", default=None,
+                        help="OpenAI-compatible base URL for the judge LLM (defaults to --base-url)")
+    parser.add_argument("--judge-api-key", default=None,
+                        help="API key for the judge LLM (defaults to --api-key)")
     parser.add_argument("--backend", default="oss", choices=["oss", "cloud"],
                         help="Mem0 backend: 'oss' for self-hosted server (default), 'cloud' for api.mem0.ai")
     parser.add_argument("--mem0-host", default=None,
                         help="Mem0 server URL (default: http://localhost:8888 for oss, https://api.mem0.ai for cloud)")
     parser.add_argument("--mem0-api-key", default=None,
                         help="Mem0 API key (cloud mode only)")
+    parser.add_argument(
+        "--no-memory",
+        action="store_true",
+        help=(
+            "Bare-LLM baseline: skip ingestion entirely and return empty search results. "
+            "The LLM answers each question with zero retrieved context. "
+            "No mem0 server needed. Use to prove memory helps."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -745,6 +758,8 @@ async def async_main() -> None:
     print(f"  Judge: {args.judge_model} ({args.judge_provider or args.provider})")
     print(f"  Conversations: {args.conversations}")
     print(f"  Cutoffs: {args.top_k_cutoffs}")
+    if args.no_memory:
+        print("  Mode: NO-MEMORY baseline (bare LLM, zero retrieved context)")
 
     # Load dataset
     if args.dataset_path:
@@ -766,7 +781,8 @@ async def async_main() -> None:
     judge_provider = args.judge_provider or args.provider
     judge_llm = LLMClient(
         model=args.judge_model, provider=judge_provider, rpm=args.rpm,
-        base_url=args.base_url, api_key=args.api_key,
+        base_url=args.judge_base_url or args.base_url,
+        api_key=args.judge_api_key or args.api_key,
     )
 
     if args.evaluate_only:
@@ -838,14 +854,25 @@ async def async_main() -> None:
         print(f"\nTotal questions evaluated: {len(all_evaluations)}")
         return
 
-    # Init Mem0 (not used for --evaluate-only)
-    backend = os.getenv("MEM0_BACKEND", args.backend)
-    mem0 = Mem0Client(
-        mode=backend,
-        host=args.mem0_host,
-        api_key=args.mem0_api_key if backend == "cloud" else None,
-        rpm=args.rpm,
-    )
+    # --no-memory: skip Mem0 entirely — use a stub that always returns empty results
+    if args.no_memory:
+        class _NoMemoryClient:
+            """Stub that does nothing on add() and returns [] on search()."""
+            async def __aenter__(self): return self
+            async def __aexit__(self, *_): pass
+            async def add(self, *a, **kw): return {"results": []}
+            async def search(self, *a, **kw): return []
+            async def delete_user(self, *a, **kw): return True
+        mem0 = _NoMemoryClient()  # type: ignore[assignment]
+    else:
+        # Init Mem0 (not used for --evaluate-only)
+        backend = os.getenv("MEM0_BACKEND", args.backend)
+        mem0 = Mem0Client(
+            mode=backend,
+            host=args.mem0_host,
+            api_key=args.mem0_api_key if backend == "cloud" else None,
+            rpm=args.rpm,
+        )
     shutdown = GracefulShutdown()
     checkpoint = Checkpoint(output_dir)
 
@@ -975,6 +1002,8 @@ async def async_main() -> None:
                     "top_k_cutoffs": [cutoff_label(c) for c in cutoffs],
                     "total_questions": len(all_evaluations),
                     "categories": categories,
+                    "no_memory": args.no_memory,
+                    "mem0_host": args.mem0_host if not args.no_memory else None,
                 },
                 "metrics_by_cutoff": metrics,
                 "evaluations": all_evaluations,
